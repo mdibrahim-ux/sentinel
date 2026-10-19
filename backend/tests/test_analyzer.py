@@ -80,3 +80,121 @@ def test_ollama_provider_uses_structured_json(monkeypatch):
     assert result["provider"] == "ollama"
     assert result["mode"] == "Local AI-assisted"
     assert result["executive_summary"] == payload["executive_summary"]
+
+def test_openrouter_provider_uses_chat_completions_and_parses_json(monkeypatch):
+    import json as jsonlib
+    from app.services import ai_explainer
+
+    payload = {
+        "executive_summary": "Evidence-based summary.",
+        "strengths": ["Repeatable source inventory."],
+        "priority_actions": [],
+        "architecture_notes": ["Imports are inferred statically."],
+        "limitations": ["No code was executed."],
+    }
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "model": "test/free-model",
+                "choices": [{"message": {"content": jsonlib.dumps(payload)}}],
+            }
+
+    class FakeClient:
+        def __init__(self, timeout):
+            captured["timeout"] = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, url, headers, json):
+            captured.update(url=url, headers=headers, request=json)
+            return FakeResponse()
+
+    monkeypatch.setattr(ai_explainer, "AI_PROVIDER", "openrouter")
+    monkeypatch.setattr(ai_explainer, "OPENROUTER_API_KEY", "test-only-key")
+    monkeypatch.setattr(ai_explainer, "OPENROUTER_BASE_URL", "https://openrouter.example/api/v1")
+    monkeypatch.setattr(ai_explainer, "OPENROUTER_MODEL", "openrouter/free")
+    monkeypatch.setattr(ai_explainer.httpx, "Client", FakeClient)
+
+    result = ai_explainer.explain_analysis(
+        {"project": "fixture", "summary": {}, "findings": [], "languages": [], "architecture": {}},
+        "mentor",
+    )
+
+    assert captured["url"] == "https://openrouter.example/api/v1/chat/completions"
+    assert captured["headers"]["Authorization"] == "Bearer test-only-key"
+    assert captured["request"]["model"] == "openrouter/free"
+    assert captured["request"]["response_format"] == {"type": "json_object"}
+    assert captured["request"]["stream"] is False
+    assert result["provider"] == "openrouter"
+    assert result["model"] == "test/free-model"
+    assert result["mode"] == "Cloud AI-assisted"
+    assert result["executive_summary"] == payload["executive_summary"]
+
+
+def test_ask_question_supports_openrouter_with_bounded_context(monkeypatch):
+    from app.services import ai_explainer
+
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "model": "test/free-model",
+                "choices": [{"message": {"content": "Review the high-severity evidence first."}}],
+            }
+
+    class FakeClient:
+        def __init__(self, timeout):
+            captured["timeout"] = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, url, headers, json):
+            captured.update(url=url, headers=headers, request=json)
+            return FakeResponse()
+
+    monkeypatch.setattr(ai_explainer, "AI_PROVIDER", "openrouter")
+    monkeypatch.setattr(ai_explainer, "OPENROUTER_API_KEY", "test-only-key")
+    monkeypatch.setattr(ai_explainer, "OPENROUTER_BASE_URL", "https://openrouter.example/api/v1")
+    monkeypatch.setattr(ai_explainer, "OPENROUTER_MODEL", "openrouter/free")
+    monkeypatch.setattr(ai_explainer.httpx, "Client", FakeClient)
+
+    result = ai_explainer.answer_question(
+        {
+            "project": "fixture",
+            "summary": {"files_analyzed": 1},
+            "findings": [],
+            "files": [],
+            "languages": [],
+            "source": {},
+            "architecture": {},
+        },
+        "What should I fix first?",
+    )
+
+    assert captured["url"] == "https://openrouter.example/api/v1/chat/completions"
+    assert captured["headers"]["Authorization"] == "Bearer test-only-key"
+    assert captured["request"]["model"] == "openrouter/free"
+    assert captured["request"]["messages"][-1]["content"].endswith("CURRENT QUESTION: What should I fix first?")
+    assert result == {
+        "answer": "Review the high-severity evidence first.",
+        "provider": "openrouter",
+        "model": "test/free-model",
+    }
+
