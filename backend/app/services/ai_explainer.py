@@ -268,6 +268,17 @@ def answer_question(analysis: dict[str, Any], question: str, selected_path: str 
             raise ValueError("The model returned an empty answer.")
         return {"answer": answer[:6000], "provider": provider, "model": model}
     except httpx.TimeoutException as exc:
-        raise TimeoutError("Ask Sentinal timed out while waiting for the local model. Try a shorter question.") from exc
+        if AI_PROVIDER == "openrouter":
+            message = "Ask Sentinal timed out while waiting for OpenRouter. Check your connection and free-model availability, then try again."
+        else:
+            message = "Ask Sentinal timed out while waiting for the local model. Try a shorter question."
+        raise TimeoutError(message) from exc
     except httpx.HTTPError as exc:
-        raise RuntimeError(f"Ask Sentinal could not reach the local model ({type(exc).__name__}). Check that Ollama is running.") from exc
+        if AI_PROVIDER == "openrouter":
+            message = (
+                f"Ask Sentinal could not complete the OpenRouter request ({type(exc).__name__}). "
+                "Check the API key, selected model, and usage limits."
+            )
+        else:
+            message = f"Ask Sentinal could not reach the local model ({type(exc).__name__}). Check that Ollama is running."
+        raise RuntimeError(message) from exc
