@@ -125,3 +125,32 @@ def test_profile_round_trips_through_persistent_store():
 def test_profile_rejects_non_http_urls():
     response = client.put("/api/profile", json={"website": "javascript:alert(1)"})
     assert response.status_code == 422
+
+
+def test_ask_sentinal_accepts_openrouter_provider(monkeypatch):
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "AI_PROVIDER", "openrouter")
+    monkeypatch.setattr(main_module, "OPENROUTER_API_KEY", "test-only-key")
+    monkeypatch.setattr(
+        main_module,
+        "answer_question",
+        lambda analysis, question, selected_path=None, history=None: {
+            "answer": "Review the highest-priority finding first.",
+            "provider": "openrouter",
+            "model": "test/free-model",
+        },
+    )
+
+    submitted = client.post("/api/analysis/demo")
+    assert submitted.status_code == 200
+    job_id = submitted.json()["id"]
+
+    response = client.post(
+        f"/api/analysis/{job_id}/ask",
+        json={"question": "What should I fix first?"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "openrouter"
+    assert response.json()["model"] == "test/free-model"
