@@ -1,0 +1,35 @@
+.env
+.env.*
+!.env.example
+**/.venv/
+**/venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/node_modules/
+**/dist/
+backend/data/
+backend/.coverage
+coverage.xml
+*.py[cod]
+*.pdf
+!sample-report.pdf
+.DS_Store
+Thumbs.db
+data/
+
+# Secrets and local environment configuration
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Node.js
+node_modules/
+dist/
+coverage/

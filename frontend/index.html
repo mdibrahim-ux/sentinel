@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FAF2D2" />
+    <meta name="description" content="Sentinal provides evidence-based codebase analysis and clear PDF reports." />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem('sentinal-theme');
+          const preference = saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
+          const resolved = preference === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : preference;
+          document.documentElement.dataset.theme = resolved;
+          document.documentElement.dataset.themePreference = preference;
+          document.documentElement.style.colorScheme = resolved;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolved === 'dark' ? '#080A12' : '#FAF2D2');
+        } catch {
+          document.documentElement.dataset.theme = 'light';
+          document.documentElement.dataset.themePreference = 'system';
+        }
+      })();
+    </script>
+    <title>Sentinal — Codebase Intelligence</title>
+  </head>
+  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+</html>

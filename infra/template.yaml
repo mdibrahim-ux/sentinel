@@ -1,0 +1,479 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Sentinal codebase intelligence API, staged worker, private artifacts, and evidence history.
+Parameters:
+  FrontendOrigin:
+    Type: String
+    Default: http://localhost:5173
+    Description: Exact browser origin serving Sentinal. Use https for deployed frontends.
+  AiProvider:
+    Type: String
+    Default: disabled
+    AllowedValues: [disabled, bedrock]
+    Description: AI calls default to disabled; Bedrock inference may incur usage charges.
+  BedrockModelId:
+    Type: String
+    Default: ''
+    Description: Model ID or inference-profile ID/ARN sent to the Bedrock Converse API.
+  BedrockModelArn:
+    Type: String
+    Default: ''
+    Description: Exact approved Bedrock resource ARN for narrowly scoped IAM permissions; leave blank when AI is disabled.
+  CreateErrorAlarm:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Optional CloudWatch alarm. Review current pricing and free allowance before enabling.
+Conditions:
+  UseBedrock: !And [!Equals [!Ref AiProvider, bedrock], !Not [!Equals [!Ref BedrockModelId, '']], !Not [!Equals [!Ref BedrockModelArn, '']]]
+  EnableErrorAlarm: !Equals [!Ref CreateErrorAlarm, 'true']
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [x86_64]
+    MemorySize: 512
+    Timeout: 30
+    Environment:
+      Variables:
+        AWS_RUNTIME_ENABLED: 'true'
+        AI_PROVIDER: !Ref AiProvider
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
+Resources:
+  SentinalArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: RemoveTemporaryInputs
+            Status: Enabled
+            Prefix: inputs/
+            ExpirationInDays: 1
+          - Id: ExpireReportsAfterThirtyDays
+            Status: Enabled
+            Prefix: reports/
+            ExpirationInDays: 30
+          - Id: ExpireAnalysisSnapshotsAfterThirtyDays
+            Status: Enabled
+            Prefix: analysis/
+            ExpirationInDays: 30
+  SentinalJobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: job_id
+          AttributeType: S
+        - AttributeName: owner_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: job_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: OwnerCreatedIndex
+          KeySchema:
+            - AttributeName: owner_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      SSESpecification:
+        SSEEnabled: true
+  SentinalFindingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: job_id
+          AttributeType: S
+        - AttributeName: finding_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: job_id
+          KeyType: HASH
+        - AttributeName: finding_id
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+  SentinalProfilesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: owner_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: owner_id
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+  SentinalUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'sentinal-users-${AWS::StackName}'
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 10
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          TemporaryPasswordValidityDays: 3
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+  SentinalUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: sentinal-browser
+      UserPoolId: !Ref SentinalUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 7
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+  SentinalApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins: [!Ref FrontendOrigin]
+        AllowMethods: [GET, POST, PUT, PATCH, OPTIONS]
+        AllowHeaders: [Authorization, Content-Type]
+        MaxAge: 600
+      Auth:
+        Authorizers:
+          SentinalJwt:
+            IdentitySource: '$request.header.Authorization'
+            JwtConfiguration:
+              audience: [!Ref SentinalUserPoolClient]
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${SentinalUserPool}'
+        DefaultAuthorizer: SentinalJwt
+  SentinalApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: app.main.handler
+      Timeout: 30
+      Environment:
+        Variables:
+          SENTINAL_BUCKET: !Ref SentinalArtifactsBucket
+          SENTINAL_JOBS_TABLE: !Ref SentinalJobsTable
+          SENTINAL_FINDINGS_TABLE: !Ref SentinalFindingsTable
+          SENTINAL_PROFILES_TABLE: !Ref SentinalProfilesTable
+          SENTINAL_STATE_MACHINE_ARN: !Ref SentinalReviewOrchestrator
+          MAX_UPLOAD_MB: '5'
+          MAX_FILES: '500'
+          SENTINAL_CORS_ORIGINS: !Ref FrontendOrigin
+      Policies:
+        - Statement:
+            - Sid: WriteApiLogs
+              Effect: Allow
+              Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+              Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*'
+            - Sid: ReadWriteOwnedJobRecords
+              Effect: Allow
+              Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:Query]
+              Resource:
+                - !GetAtt SentinalJobsTable.Arn
+                - !Sub '${SentinalJobsTable.Arn}/index/*'
+                - !GetAtt SentinalFindingsTable.Arn
+                - !GetAtt SentinalProfilesTable.Arn
+            - Sid: PrivateArtifactReadWrite
+              Effect: Allow
+              Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+              Resource: !Sub '${SentinalArtifactsBucket.Arn}/*'
+            - Sid: StartAnalysisWorkflow
+              Effect: Allow
+              Action: [states:StartExecution]
+              Resource: !Ref SentinalReviewOrchestrator
+      Events:
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SentinalApi
+            Path: /{proxy+}
+            Method: ANY
+  SentinalWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: app.lambda_worker.handler
+      Timeout: 120
+      MemorySize: 1024
+      Environment:
+        Variables:
+          SENTINAL_BUCKET: !Ref SentinalArtifactsBucket
+          SENTINAL_JOBS_TABLE: !Ref SentinalJobsTable
+          SENTINAL_FINDINGS_TABLE: !Ref SentinalFindingsTable
+          MAX_UPLOAD_MB: '5'
+          MAX_FILES: '500'
+      Role: !GetAtt SentinalWorkerRole.Arn
+  SentinalWorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SentinalWorkerOperationalAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: WriteWorkerLogs
+                Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*'
+              - Sid: ReadWriteJobRecords
+                Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:Query]
+                Resource:
+                  - !GetAtt SentinalJobsTable.Arn
+                  - !Sub '${SentinalJobsTable.Arn}/index/*'
+                  - !GetAtt SentinalFindingsTable.Arn
+              - Sid: PrivateArtifactReadWrite
+                Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                Resource: !Sub '${SentinalArtifactsBucket.Arn}/*'
+  SentinalBedrockInvokePolicy:
+    Type: AWS::IAM::Policy
+    Condition: UseBedrock
+    Properties:
+      PolicyName: SentinalInvokeConfiguredBedrockModel
+      Roles: [!Ref SentinalWorkerRole]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+            Resource: !Ref BedrockModelArn
+  SentinalReviewOrchestrator:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub 'SentinalReviewOrchestrator-${AWS::StackName}'
+      StateMachineType: STANDARD
+      RoleArn: !GetAtt SentinalWorkflowRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "Sentinal stages: deterministic analysis, evidence-based explanation, and PDF report.",
+          "StartAt": "Analyze",
+          "States": {
+            "Analyze": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {"FunctionName": "${SentinalWorkerFunction.Arn}", "Payload": {"job_id.$": "$.job_id", "action": "analyze"}},
+              "ResultPath": "$.analysis_stage",
+              "Retry": [{"ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"], "IntervalSeconds": 2, "MaxAttempts": 2, "BackoffRate": 2.0}],
+              "Next": "Explain"
+            },
+            "Explain": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {"FunctionName": "${SentinalWorkerFunction.Arn}", "Payload": {"job_id.$": "$.job_id", "action": "explain"}},
+              "ResultPath": "$.explanation_stage",
+              "Retry": [{"ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"], "IntervalSeconds": 2, "MaxAttempts": 2, "BackoffRate": 2.0}],
+              "Next": "GenerateReport"
+            },
+            "GenerateReport": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {"FunctionName": "${SentinalWorkerFunction.Arn}", "Payload": {"job_id.$": "$.job_id", "action": "report"}},
+              "ResultPath": "$.report_stage",
+              "Retry": [{"ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"], "IntervalSeconds": 2, "MaxAttempts": 2, "BackoffRate": 2.0}],
+              "End": true
+            }
+          }
+        }
+  SentinalWorkflowRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeSentinalWorkerOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [lambda:InvokeFunction]
+                Resource: !GetAtt SentinalWorkerFunction.Arn
+  SentinalCiProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub 'sentinal-ci-${AWS::StackName}'
+      Description: Runs Sentinal's own tests and frontend build from a reviewed S3 source archive; it does not execute submitted user repositories by default.
+      ServiceRole: !GetAtt SentinalCodeBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:7.0
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: false
+        EnvironmentVariables: []
+      Source:
+        Type: S3
+        Location: !Sub '${SentinalArtifactsBucket}/ci/sentinal-source.zip'
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.12
+                nodejs: 20
+            build:
+              commands:
+                - python -m pip install -r backend/requirements.txt
+                - cd backend && python -m pytest -q && cd ..
+                - cd frontend && npm install && npm run build
+          cache:
+            paths:
+              - '/root/.cache/pip/**/*'
+              - 'frontend/node_modules/**/*'
+      TimeoutInMinutes: 15
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Sub '/aws/codebuild/sentinal-ci-${AWS::StackName}'
+  SentinalCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReadReviewedSourceAndWriteBuildLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject]
+                Resource: !Sub '${SentinalArtifactsBucket.Arn}/ci/sentinal-source.zip'
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/sentinal-ci-${AWS::StackName}:*'
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SentinalApiFunction}'
+      RetentionInDays: 7
+  WorkerFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SentinalWorkerFunction}'
+      RetentionInDays: 7
+  WorkerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableErrorAlarm
+    Properties:
+      AlarmName: !Sub 'sentinal-worker-errors-${AWS::StackName}'
+      AlarmDescription: Lambda worker has reported more than two errors in five minutes. Review logs and usage costs.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref SentinalWorkerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 2
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+  WorkflowFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableErrorAlarm
+    Properties:
+      AlarmName: !Sub 'sentinal-workflow-failures-${AWS::StackName}'
+      AlarmDescription: Step Functions analysis executions have failed. Review execution history and worker logs.
+      Namespace: AWS/States
+      MetricName: ExecutionsFailed
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref SentinalReviewOrchestrator
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+  WorkerDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableErrorAlarm
+    Properties:
+      AlarmName: !Sub 'sentinal-worker-duration-${AWS::StackName}'
+      AlarmDescription: Worker stage duration is approaching its 120-second timeout.
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref SentinalWorkerFunction
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 100000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+Outputs:
+  ApiBaseUrl:
+    Description: HTTP API base URL. Append /api routes as documented.
+    Value: !Sub 'https://${SentinalApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/prod'
+  ArtifactsBucketName:
+    Value: !Ref SentinalArtifactsBucket
+  JobsTableName:
+    Value: !Ref SentinalJobsTable
+  FindingsTableName:
+    Value: !Ref SentinalFindingsTable
+  ProfilesTableName:
+    Value: !Ref SentinalProfilesTable
+  StateMachineArn:
+    Value: !Ref SentinalReviewOrchestrator
+  CodeBuildProjectName:
+    Value: !Ref SentinalCiProject
+  CognitoUserPoolId:
+    Value: !Ref SentinalUserPool
+  CognitoUserPoolClientId:
+    Value: !Ref SentinalUserPoolClient
+  CognitoIssuer:
+    Value: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${SentinalUserPool}'
+  AiProviderConfigured:
+    Value: !Ref AiProvider
