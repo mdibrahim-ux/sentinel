@@ -14,7 +14,7 @@ Sentinal accepts a public GitHub repository URL or a small source ZIP, inventori
 - Import/dependency relationship map, largest-file graph, severity distribution, and heuristic health triage score with a documented method.
 - Four-page PDF report: project metadata and representative repository tree; findings severity pie and bar charts; prioritized solutions; directory-level risk concentration, evidence confidence, and coverage limits.
 - Local SQLite history, finding-state updates (`open`, `investigate`, `accepted`, `fixed`, `ignored`), report download, mentor/developer audience.
-- Optional Ollama, OpenAI, or Amazon Bedrock narrative layer. Provider choice is explicit; Ollama uses local machine resources, and external providers can incur charges. The Ask Sentinal panel uses local Ollama only and never silently switches to Bedrock.
+- Optional Ollama, OpenRouter, OpenAI, or Amazon Bedrock AI narrative layer. Provider selection is explicit; Ollama uses local machine resources, while cloud providers send bounded analysis prompts to their service and may have usage limits or charges. Ask Sentinal supports Ollama or OpenRouter in the local workspace and never silently changes providers.
 - AWS SAM/CloudFormation template for API Gateway, Lambda, Step Functions, S3, DynamoDB, Cognito, CodeBuild and CloudWatch logs; optional alarm and model permissions are gated.
 - Responsive comic-engineering product UI with a persistent light/dark/system theme, dock navigation, interactive Repo Atlas, Ask Sentinal, and a three-step keyboard-operable product tour.
 
@@ -71,13 +71,16 @@ The tests assert selected analyzer outcomes, path/ZIP safety and API validation.
 
 ## Optional AI explanation and Ask Sentinal
 
-The default `AI_PROVIDER=disabled` makes deterministic analysis and report generation work without model inference. For optional AI explanations and Ask Sentinal, `ollama` is the local path (it uses your own machine resources); external Bedrock/OpenAI providers can incur costs. Review data handling and privacy before enabling any provider:
+The default `AI_PROVIDER=disabled` makes deterministic analysis and report generation work without model inference. You can keep AI disabled, run Ollama locally, or explicitly select a cloud provider. External providers receive the bounded prompt and evidence subset and have their own availability, privacy, and usage terms:
 
 - `AI_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://127.0.0.1:11434`, and `OLLAMA_MODEL=qwen2.5-coder:3b` use a local Ollama API (change the model setting if you have configured a different model). Install Ollama and pull the model separately; generation uses local CPU/GPU/memory and no model API key.
+- `AI_PROVIDER=openrouter`, `OPENROUTER_API_KEY`, optionally `OPENROUTER_MODEL` (default `openrouter/free`) and `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`) use OpenRouter's OpenAI-compatible chat-completions API. Create the key in the OpenRouter dashboard and keep it in the backend environment only. The `openrouter/free` router provides free-model inference, but models can be rate-limited or unavailable; check current OpenRouter limits and model/provider data policies.
 - `AI_PROVIDER=bedrock` and `BEDROCK_MODEL_ID=<approved model or inference-profile ID>` use the AWS SDK. The deployed IAM role must be scoped to the corresponding approved `BedrockModelArn`; both values are required in `infra/template.yaml`.
 - `AI_PROVIDER=openai`, `OPENAI_API_KEY`, and optionally `OPENAI_MODEL` use the OpenAI API. Keep keys in an environment secret manager; never place them in Vite variables or frontend source.
 
-Source excerpts sent to a model may include proprietary code. The prompt labels repository content as untrusted and sends a bounded, redacted evidence subset, but this cannot guarantee complete secret removal. AI calls can cost money. No model API is called with the default settings.
+OpenRouter is supported by the local backend for report explanations and Ask Sentinal. The AWS runtime remains governed by its deployed configuration and route boundaries; do not assume this change automatically configures cloud deployment secrets or enables Ask Sentinal in AWS mode.
+
+Source excerpts sent to a model may include proprietary code. The application sends a bounded, redacted evidence subset, but redaction cannot guarantee complete secret removal. Review the selected model provider's data practices before sending proprietary source code. Cloud inference is not automatically private or free in every provider configuration. No model API is called with the default settings.
 
 ## AWS deployment — not performed from this session
 
