@@ -6,7 +6,61 @@ from typing import Any
 
 import httpx
 
-from app.config import AI_PROVIDER, AWS_REGION, BEDROCK_MODEL_ID, OLLAMA_BASE_URL, OLLAMA_MODEL, OPENAI_MODEL
+from app.config import (AI_PROVIDER, AWS_REGION, BEDROCK_MODEL_ID, OLLAMA_BASE_URL, OLLAMA_MODEL,
+                        OPENAI_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, OPENROUTER_MODEL)
+
+
+def _openrouter_headers() -> dict[str, str]:
+    """Build request headers without ever logging or exposing the API key."""
+    if not OPENROUTER_API_KEY:
+        raise RuntimeError("AI_PROVIDER=openrouter requires OPENROUTER_API_KEY in the backend environment.")
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "X-Title": "Sentinal",
+    }
+    referer = os.getenv("OPENROUTER_HTTP_REFERER", "").strip()
+    if referer:
+        headers["HTTP-Referer"] = referer
+    return headers
+
+
+def _openrouter_chat(
+    messages: list[dict[str, str]],
+    *,
+    timeout: Any,
+    max_tokens: int,
+    json_output: bool = False,
+) -> tuple[str, str]:
+    """Call OpenRouter's OpenAI-compatible chat-completions API."""
+    payload: dict[str, Any] = {
+        "model": OPENROUTER_MODEL,
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": max_tokens,
+        "stream": False,
+    }
+    if json_output:
+        # The free router chooses a compatible model when structured output is requested.
+        payload["response_format"] = {"type": "json_object"}
+
+    with httpx.Client(timeout=timeout) as client:
+        response = client.post(
+            f"{OPENROUTER_BASE_URL}/chat/completions",
+            headers=_openrouter_headers(),
+            json=payload,
+        )
+        response.raise_for_status()
+        body = response.json()
+
+    try:
+        content = body["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ValueError("OpenRouter returned an unexpected chat-completion response.") from exc
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("OpenRouter returned an empty or non-text response.")
+    actual_model = str(body.get("model") or OPENROUTER_MODEL)
+    return actual_model, content.strip()
 
 
 def _build_prompt(analysis: dict[str, Any], audience: str) -> str:
@@ -43,6 +97,24 @@ def explain_analysis(analysis: dict[str, Any], audience: str = "developer") -> d
             return {"provider": "ollama", "model": OLLAMA_MODEL, "mode": "Local AI-assisted", **parsed}
         except Exception as exc:
             return _fallback(analysis, reason=f"Local Ollama explanation failed ({type(exc).__name__}); deterministic summary used.")
+    if provider == "openrouter":
+        if not OPENROUTER_API_KEY:
+            return _fallback(analysis, reason="OpenRouter is selected but OPENROUTER_API_KEY is missing; deterministic summary used.")
+        try:
+            model, text = _openrouter_chat(
+                [
+                    {"role": "system", "content": "Respond with valid JSON only. Follow the requested schema exactly."},
+                    {"role": "user", "content": prompt},
+                ],
+                timeout=httpx.Timeout(60.0, connect=10.0),
+                max_tokens=1800,
+                json_output=True,
+            )
+            parsed = _parse_json(text)
+            return {"provider": "openrouter", "model": model, "mode": "Cloud AI-assisted", **parsed}
+        except Exception as exc:
+            # Do not expose response bodies, prompts, or credentials in error messages.
+            return _fallback(analysis, reason=f"OpenRouter explanation failed ({type(exc).__name__}); deterministic summary used.")
     if provider == "openai" and os.getenv("OPENAI_API_KEY"):
         try:
             with httpx.Client(timeout=40) as client:
@@ -68,7 +140,7 @@ def explain_analysis(analysis: dict[str, Any], audience: str = "developer") -> d
             return {"provider": "bedrock", "model": BEDROCK_MODEL_ID, "mode": "AI-assisted", **parsed}
         except Exception as exc:
             return _fallback(analysis, reason=f"Bedrock explanation failed ({type(exc).__name__}); deterministic summary used.")
-    return _fallback(analysis, reason="AI explanation is disabled or unavailable. Set AI_PROVIDER=ollama for an explicitly configured local model, or choose a paid provider only after reviewing costs and privacy.")
+    return _fallback(analysis, reason="AI explanation is disabled or unavailable. Set AI_PROVIDER=ollama for local inference or AI_PROVIDER=openrouter with OPENROUTER_API_KEY for OpenRouter cloud inference. Review provider costs and privacy before enabling external services.")
 
 
 def _parse_json(text: str) -> dict[str, Any]:
@@ -113,11 +185,13 @@ def answer_question(analysis: dict[str, Any], question: str, selected_path: str 
                     history: list[dict[str, str]] | None = None) -> dict[str, Any]:
     """Answer a small code-review question from a bounded, structured analysis snapshot.
 
-    This feature intentionally supports local Ollama only. The model sees finding evidence
-    and repository metrics, not the whole repository or arbitrary source files.
+    Ollama runs locally; OpenRouter sends the bounded prompt to an external cloud provider.
+    The model sees selected findings and repository metrics, not the whole repository or arbitrary files.
     """
-    if AI_PROVIDER != "ollama":
-        raise RuntimeError("Ask Sentinal requires AI_PROVIDER=ollama in the local backend.")
+    if AI_PROVIDER not in {"ollama", "openrouter"}:
+        raise RuntimeError("Ask Sentinal requires AI_PROVIDER=ollama or AI_PROVIDER=openrouter.")
+    if AI_PROVIDER == "openrouter" and not OPENROUTER_API_KEY:
+        raise RuntimeError("Ask Sentinal requires OPENROUTER_API_KEY when AI_PROVIDER=openrouter.")
 
     findings = list(analysis.get("findings", []))
     selected_findings = [f for f in findings if selected_path and f.get("path") == selected_path]
@@ -168,22 +242,43 @@ def answer_question(analysis: dict[str, Any], question: str, selected_path: str 
                   + "\n\nCURRENT QUESTION: " + question.strip(),
     })
     try:
-        with httpx.Client(timeout=httpx.Timeout(45.0, connect=5.0)) as client:
-            response = client.post(
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "stream": False,
-                    "messages": messages,
-                    "options": {"temperature": 0.2, "num_predict": 420, "top_p": 0.85},
-                },
+        if AI_PROVIDER == "openrouter":
+            model, answer = _openrouter_chat(
+                messages,
+                timeout=httpx.Timeout(45.0, connect=5.0),
+                max_tokens=500,
             )
-            response.raise_for_status()
-            answer = str(response.json().get("message", {}).get("content", "")).strip()
+            provider = "openrouter"
+        else:
+            with httpx.Client(timeout=httpx.Timeout(45.0, connect=5.0)) as client:
+                response = client.post(
+                    f"{OLLAMA_BASE_URL}/api/chat",
+                    json={
+                        "model": OLLAMA_MODEL,
+                        "stream": False,
+                        "messages": messages,
+                        "options": {"temperature": 0.2, "num_predict": 420, "top_p": 0.85},
+                    },
+                )
+                response.raise_for_status()
+                answer = str(response.json().get("message", {}).get("content", "")).strip()
+            model = OLLAMA_MODEL
+            provider = "ollama"
         if not answer:
             raise ValueError("The model returned an empty answer.")
-        return {"answer": answer[:6000], "provider": "ollama", "model": OLLAMA_MODEL}
+        return {"answer": answer[:6000], "provider": provider, "model": model}
     except httpx.TimeoutException as exc:
-        raise TimeoutError("Ask Sentinal timed out while waiting for the local model. Try a shorter question.") from exc
+        if AI_PROVIDER == "openrouter":
+            message = "Ask Sentinal timed out while waiting for OpenRouter. Check your connection and free-model availability, then try again."
+        else:
+            message = "Ask Sentinal timed out while waiting for the local model. Try a shorter question."
+        raise TimeoutError(message) from exc
     except httpx.HTTPError as exc:
-        raise RuntimeError(f"Ask Sentinal could not reach the local model ({type(exc).__name__}). Check that Ollama is running.") from exc
+        if AI_PROVIDER == "openrouter":
+            message = (
+                f"Ask Sentinal could not complete the OpenRouter request ({type(exc).__name__}). "
+                "Check the API key, selected model, and usage limits."
+            )
+        else:
+            message = f"Ask Sentinal could not reach the local model ({type(exc).__name__}). Check that Ollama is running."
+        raise RuntimeError(message) from exc

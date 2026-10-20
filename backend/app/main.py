@@ -15,7 +15,7 @@ try:
 except ImportError:  # Local test environments may omit the Lambda-only adapter.
     Mangum = None  # type: ignore[assignment,misc]
 
-from app.config import AI_PROVIDER, AWS_REGION, MAX_UPLOAD_BYTES, REPORT_DIR, UPLOAD_DIR, SENTINAL_STATE_MACHINE_ARN
+from app.config import AI_PROVIDER, AWS_REGION, MAX_UPLOAD_BYTES, OPENROUTER_API_KEY, REPORT_DIR, UPLOAD_DIR, SENTINAL_STATE_MACHINE_ARN
 from app.schemas import AnalysisRequest, AskSentinalRequest, FindingStatusUpdate, ProfilePayload
 from app.services.cloud_state import (delete_object, enabled as cloud_enabled, get_job as cloud_get_job,
                                       list_history as cloud_history, presigned_get, save_job as cloud_save_job,
@@ -232,11 +232,13 @@ def download_report(job_id: str, request: Request):
 
 @app.post("/api/analysis/{job_id}/ask")
 def ask_sentinal(job_id: str, payload: AskSentinalRequest, request: Request) -> dict[str, Any]:
-    """Ask a bounded question about one completed local analysis using configured Ollama."""
+    """Ask a bounded question about one completed local analysis using the configured AI provider."""
     if cloud_enabled():
         raise HTTPException(status_code=503, detail="Ask Sentinal currently requires the local workspace; the deployed AWS runtime cannot reach your local Ollama service.")
-    if AI_PROVIDER != "ollama":
-        raise HTTPException(status_code=503, detail="Ask Sentinal is unavailable because AI_PROVIDER is not set to ollama. Set it in your local .env and restart the backend.")
+    if AI_PROVIDER not in {"ollama", "openrouter"}:
+        raise HTTPException(status_code=503, detail="Ask Sentinal requires AI_PROVIDER=ollama or AI_PROVIDER=openrouter. Configure a provider in your local .env and restart the backend.")
+    if AI_PROVIDER == "openrouter" and not OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="OpenRouter is selected but OPENROUTER_API_KEY is missing. Add it to your backend environment and restart the backend.")
     job = _load_job(job_id, _owner(request))
     if job.get("status") != "completed" or not job.get("analysis"):
         raise HTTPException(status_code=409, detail="Wait until the analysis is completed before asking questions.")
