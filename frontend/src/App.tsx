@@ -59,6 +59,8 @@ function AppIcon({ name, size = 18 }: { name: string; size?: number }) {
     case 'check': glyph = <path d="m5 12 4.5 4.5L19 7"/>; break;
     case 'lock': glyph = <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>; break;
     case 'mail': glyph = <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></>; break;
+    case 'folder': glyph = <><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 9h18"/></>; break;
+    case 'file-code': glyph = <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M10 13l-2 2 2 2M14 13l2 2-2 2"/></>; break;
     case 'file': glyph = <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></>; break;
     case 'calendar': glyph = <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>; break;
     case 'plus': glyph = <><path d="M12 5v14M5 12h14"/></>; break;
@@ -197,68 +199,195 @@ function FileBarChart({ analysis }: { analysis?: Analysis | null }) {
   return <div className="file-bars">{files.map((file,i)=><div className="file-bar-row" key={file.path}><div className="file-bar-label" title={file.path}>{file.path.split('/').pop()}</div><div className="file-bar-track"><span style={{width:`${file.loc/max*100}%`,background:i%2===0?'#006D77':'#FF8C00'}}></span></div><strong>{file.loc}</strong></div>)}</div>;
 }
 
+type ArchitectureTreeNode = {
+  id: string;
+  name: string;
+  kind: 'directory' | 'file';
+  path?: string;
+  language?: string;
+  file?: Analysis['files'][number];
+  children: ArchitectureTreeNode[];
+  fileCount: number;
+  findingCount: number;
+};
+
+function ArchitectureTreeBranch({
+  node, expandedPaths, selectedPath, searchActive, onToggle, onSelect,
+}: {
+  node: ArchitectureTreeNode;
+  expandedPaths: Set<string>;
+  selectedPath: string;
+  searchActive: boolean;
+  onToggle: (id: string) => void;
+  onSelect: (path: string) => void;
+}) {
+  const isDirectory = node.kind === 'directory';
+  const hasChildren = isDirectory && node.children.length > 0;
+  const expanded = hasChildren && (expandedPaths.has(node.id) || searchActive);
+  const selected = !isDirectory && node.path === selectedPath;
+  const file = node.file;
+
+  return <li className={`project-tree-item ${isDirectory ? 'project-tree-directory' : 'project-tree-file'} ${selected ? 'project-tree-selected' : ''}`}>
+    <button
+      type="button"
+      className={`project-tree-card ${isDirectory ? 'project-tree-folder-card' : 'project-tree-file-card'} ${selected ? 'project-tree-card-selected' : ''} ${node.findingCount ? 'project-tree-card-risk' : ''}`}
+      onClick={() => isDirectory ? onToggle(node.id) : node.path && onSelect(node.path)}
+      aria-expanded={isDirectory ? expanded : undefined}
+      aria-current={selected ? 'true' : undefined}
+      title={isDirectory ? `${node.name}: ${node.fileCount} files, ${node.findingCount} findings` : node.path}
+    >
+      <span className={`project-tree-icon ${isDirectory ? 'project-tree-folder-icon' : 'project-tree-file-icon'}`} aria-hidden="true">
+        {isDirectory ? <AppIcon name="folder" size={19}/> : <AppIcon name="file-code" size={18}/>}
+      </span>
+      <span className="project-tree-copy">
+        <strong>{node.name}</strong>
+        <small>{isDirectory
+          ? `${node.fileCount} file${node.fileCount === 1 ? '' : 's'} · ${node.findingCount} finding${node.findingCount === 1 ? '' : 's'}`
+          : `${node.language || 'File'} · ${file?.loc.toLocaleString() || 0} LOC · ${node.findingCount} finding${node.findingCount === 1 ? '' : 's'}`}</small>
+      </span>
+      {isDirectory && <span className={`project-tree-chevron ${expanded ? 'project-tree-chevron-open' : ''}`} aria-hidden="true"><AppIcon name="chevron-down" size={15}/></span>}
+      {!isDirectory && <span className={`project-tree-status ${node.findingCount ? 'project-tree-status-risk' : ''}`} aria-label={node.findingCount ? 'Findings present' : 'No findings'} />}
+    </button>
+    {hasChildren && expanded && <ul className="project-tree-level">
+      {node.children.map(child => <ArchitectureTreeBranch
+        key={child.id}
+        node={child}
+        expandedPaths={expandedPaths}
+        selectedPath={selectedPath}
+        searchActive={searchActive}
+        onToggle={onToggle}
+        onSelect={onSelect}
+      />)}
+    </ul>}
+  </li>;
+}
+
 function ArchitectureMap({ analysis }: { analysis?: Analysis | null }) {
   const [selectedPath, setSelectedPath] = useState('');
   const [search, setSearch] = useState('');
-  const nodes = useMemo(() => {
-    const sourceNodes = analysis?.architecture.nodes?.length
-      ? analysis.architecture.nodes
-      : (analysis?.files || []).map(file => ({ id: file.path, language: file.language }));
-    return sourceNodes.filter(node => node.id.toLowerCase().includes(search.toLowerCase())).slice(0, 20);
-  }, [analysis, search]);
-  const edges = analysis?.architecture.edges || [];
-  const width = 960;
-  const columns = 4;
-  const rowCount = Math.max(1, Math.ceil(nodes.length / columns));
-  const height = Math.max(190, 86 + rowCount * 98);
-  const positions = new Map(nodes.map((node, i) => [node.id, { x: 112 + (i % columns) * 240, y: 53 + Math.floor(i / columns) * 98 }]));
-  const visibleEdges = edges.filter(edge => positions.has(edge.source) && positions.has(edge.target)).slice(0, 70);
-  const activePath = selectedPath && nodes.some(node => node.id === selectedPath)
-    ? selectedPath : nodes[0]?.id || '';
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
+
+  const visibleFiles = useMemo(() => {
+    const allFiles = analysis?.files || [];
+    const term = search.trim().toLowerCase();
+    return term ? allFiles.filter(file => file.path.toLowerCase().includes(term)) : allFiles;
+  }, [analysis?.files, search]);
+
+  const tree = useMemo(() => {
+    const root: ArchitectureTreeNode = {
+      id: 'project-root', name: analysis?.project || 'Project', kind: 'directory',
+      children: [], fileCount: 0, findingCount: 0,
+    };
+    const findingsByPath = new Map<string, number>();
+    (analysis?.findings || []).forEach(finding => {
+      if (finding.path) findingsByPath.set(finding.path, (findingsByPath.get(finding.path) || 0) + 1);
+    });
+
+    const directoryIndex = new Map<string, ArchitectureTreeNode>([['', root]]);
+    visibleFiles.forEach(file => {
+      const parts = file.path.split('/').filter(Boolean);
+      let parent = root;
+      let prefix = '';
+      parts.forEach((part, index) => {
+        prefix = prefix ? `${prefix}/${part}` : part;
+        const isFile = index === parts.length - 1;
+        const id = isFile ? `file:${prefix}` : `directory:${prefix}`;
+        let node = directoryIndex.get(id);
+        if (!node) {
+          node = {
+            id, name: part, kind: isFile ? 'file' : 'directory',
+            path: isFile ? file.path : undefined,
+            language: isFile ? file.language : undefined,
+            file: isFile ? file : undefined,
+            children: [], fileCount: 0,
+            findingCount: isFile ? findingsByPath.get(file.path) || 0 : 0,
+          };
+          parent.children.push(node);
+          directoryIndex.set(id, node);
+        }
+        parent = node;
+      });
+    });
+
+    const summarize = (node: ArchitectureTreeNode): { files: number; findings: number } => {
+      if (node.kind === 'file') {
+        node.fileCount = 1;
+        return { files: 1, findings: node.findingCount };
+      }
+      const totals = node.children.map(summarize);
+      node.fileCount = totals.reduce((sum, item) => sum + item.files, 0);
+      node.findingCount = totals.reduce((sum, item) => sum + item.findings, 0);
+      node.children.sort((left, right) => {
+        if (left.kind !== right.kind) return left.kind === 'directory' ? -1 : 1;
+        return left.name.localeCompare(right.name);
+      });
+      return { files: node.fileCount, findings: node.findingCount };
+    };
+    summarize(root);
+
+    // Give files directly under the repository root their own branch,
+    // matching the same folder -> files structure as the other branches.
+    const rootFiles = root.children.filter(child => child.kind === 'file');
+    if (rootFiles.length) {
+      root.children = root.children.filter(child => child.kind === 'directory');
+      root.children.unshift({
+        id: 'directory:__root_files__', name: 'Root files', kind: 'directory',
+        children: rootFiles, fileCount: rootFiles.length,
+        findingCount: rootFiles.reduce((sum, file) => sum + file.findingCount, 0),
+      });
+    }
+    return root;
+  }, [analysis?.project, analysis?.findings, visibleFiles]);
+
+  useEffect(() => {
+    setExpandedPaths(new Set(tree.children.filter(node => node.kind === 'directory').map(node => node.id)));
+  }, [analysis?.project]);
+
+  const activePath = visibleFiles.some(file => file.path === selectedPath)
+    ? selectedPath : visibleFiles[0]?.path || '';
   const activeFile = analysis?.files.find(file => file.path === activePath);
   const activeFindings = (analysis?.findings || []).filter(finding => finding.path === activePath);
   const activeHigh = activeFindings.filter(finding => finding.severity === 'CRITICAL' || finding.severity === 'HIGH').length;
-  const getFindings = (path: string) => (analysis?.findings || []).filter(finding => finding.path === path);
+  const toggleDirectory = (id: string) => setExpandedPaths(previous => {
+    const next = new Set(previous);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
-  if (!analysis) return <div className="empty-panel"><span className="empty-mark">⌘</span><h3>Your repository map is waiting</h3><p>Run an analysis to explore inferred file-to-file imports and inspect evidence attached to each file.</p></div>;
+  if (!analysis) return <div className="empty-panel"><span className="empty-mark">⌘</span><h3>Your repository tree is waiting</h3><p>Run an analysis to explore the project root, folders, and files.</p></div>;
 
   return <div className="atlas-workspace">
     <div className="atlas-toolbar">
-      <div><span className="section-index">INTERACTIVE DEPENDENCY MAP</span><p>Choose a node to inspect its measured size and linked findings.</p></div>
-      <label className="atlas-search"><span>⌕</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find a file…" aria-label="Search architecture files" /></label>
+      <div><span className="section-index">PROJECT STRUCTURE</span><p>Follow the hierarchy from the project root into folders and files. Select any file to inspect its metrics and findings.</p></div>
+      <label className="atlas-search"><span>⌕</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find a file or folder…" aria-label="Search project tree" /></label>
     </div>
-    <div className="atlas-canvas-shell">
-      <div className="atlas-canvas-scroll"><div className="architecture-canvas">
-        {nodes.length ? <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Interactive static dependency graph">
-          <defs><marker id="atlas-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b7aabb" /></marker></defs>
-          {visibleEdges.map((edge, index) => {
-            const from = positions.get(edge.source)!; const to = positions.get(edge.target)!;
-            const highlighted = edge.source === activePath || edge.target === activePath;
-            const startY = from.y + 27; const endY = to.y - 27;
-            const mid = (startY + endY) / 2;
-            return <path key={`${edge.source}-${edge.target}-${index}`} d={`M ${from.x} ${startY} C ${from.x} ${mid}, ${to.x} ${mid}, ${to.x} ${endY}`} fill="none" stroke={highlighted ? '#EE7657' : '#CFC6D6'} strokeWidth={highlighted ? 2.2 : 1.2} opacity={highlighted ? 1 : .72} markerEnd="url(#atlas-arrow)" />;
-          })}
-          {nodes.map(node => {
-            const pos = positions.get(node.id)!; const count = getFindings(node.id).length;
-            const selected = node.id === activePath;
-            const fill = selected ? '#FFF0E9' : count ? '#FFF7F3' : '#FFFFFF';
-            const displayName = node.id.split('/').pop() || node.id;
-            return <g key={node.id} className="atlas-node" role="button" tabIndex={0} aria-label={`Inspect ${node.id}, ${count} findings`} aria-pressed={selected}
-              onClick={() => setSelectedPath(node.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedPath(node.id); } }}>
-              <rect x={pos.x - 101} y={pos.y - 27} width="202" height="54" rx="13" fill={fill} stroke={selected ? '#EE7657' : count ? '#E7A38E' : '#E6E0E9'} strokeWidth={selected ? 2.2 : 1.1}/>
-              <circle cx={pos.x - 84} cy={pos.y - 8} r="4.5" fill={count ? '#E56F5B' : '#51A68B'} />
-              <text x={pos.x - 72} y={pos.y - 5} fill="#302B35" fontSize="11" fontWeight="600">{displayName.slice(0, 22)}{displayName.length > 22 ? '…' : ''}</text>
-              <text x={pos.x - 84} y={pos.y + 13} fill="#817987" fontSize="8.8">{node.language} · {count ? `${count} finding${count === 1 ? '' : 's'}` : 'no current finding'}</text>
-            </g>;
-          })}
-        </svg> : <div className="atlas-empty"><strong>No mappable source modules were detected.</strong><span>Files are still available in the analysis inventory below.</span></div>}
-      </div></div>
-      <div className="atlas-map-footer"><span><i className="atlas-dot atlas-dot-risk"/> File has one or more findings</span><span><i className="atlas-dot atlas-dot-clear"/> No current file-scoped finding</span><span>{nodes.length} of {(analysis.architecture.nodes || []).length || analysis.files.length} displayed</span></div>
+    <div className="project-tree-shell">
+      {tree.fileCount ? <div className="project-tree-scroll">
+        <div className="project-tree">
+          <div className="project-tree-root-card">
+            <span className="project-tree-root-kicker">PROJECT ROOT</span>
+            <strong>{analysis.project}</strong>
+            <small>{analysis.files.length} files · {tree.children.length} top-level branches · {analysis.findings.length} findings</small>
+          </div>
+          <ul className="project-tree-level project-tree-root-level">
+            {tree.children.map(child => <ArchitectureTreeBranch
+              key={child.id}
+              node={child}
+              expandedPaths={expandedPaths}
+              selectedPath={activePath}
+              searchActive={Boolean(search.trim())}
+              onToggle={toggleDirectory}
+              onSelect={setSelectedPath}
+            />)}
+          </ul>
+        </div>
+      </div> : <div className="atlas-empty"><strong>{search ? 'No matching files were found.' : 'No supported files were detected.'}</strong><span>{search ? 'Try a shorter file or folder name.' : 'The repository may contain only unsupported or binary files.'}</span></div>}
+      <div className="atlas-map-footer"><span><i className="atlas-dot atlas-dot-risk"/> File has one or more findings</span><span><i className="atlas-dot atlas-dot-clear"/> No file-scoped findings</span><span>{visibleFiles.length} of {analysis.files.length} files shown</span></div>
     </div>
     <section className="file-inspector">
       <div className="inspector-heading"><div><span className="section-index">FILE INTELLIGENCE</span><h3>{activePath || 'Select a file'}</h3></div><span className={`severity-chip ${activeHigh ? 'severity-chip-high' : activeFindings.length ? 'severity-chip-medium' : 'severity-chip-clear'}`}>{activeHigh ? `${activeHigh} HIGH / CRITICAL` : activeFindings.length ? `${activeFindings.length} SIGNAL${activeFindings.length === 1 ? '' : 'S'}` : 'NO CURRENT SIGNAL'}</span></div>
       <div className="inspector-stats">
-        <div><span>Language</span><strong>{activeFile?.language || nodes.find(node => node.id === activePath)?.language || 'Unknown'}</strong></div>
+        <div><span>Language</span><strong>{activeFile?.language || 'Unknown'}</strong></div>
         <div><span>Non-comment lines</span><strong>{activeFile ? activeFile.loc.toLocaleString() : '—'}</strong></div>
         <div><span>Physical lines</span><strong>{activeFile ? activeFile.lines.toLocaleString() : '—'}</strong></div>
         <div><span>File size</span><strong>{activeFile ? `${(activeFile.bytes / 1024).toFixed(1)} KB` : '—'}</strong></div>
@@ -809,7 +938,7 @@ function App() {
         {page==='Home'&&<Home job={job} busy={busy} onNew={()=>setPage('New analysis')} onDownload={downloadReport} onNavigate={setPage} history={history} onOpenHistory={openHistory}/>}
         {page==='New analysis'&&<NewAnalysis onSubmitRepo={submitRepo} onSubmitFile={submitFile} busy={busy}/>}
         {page==='Findings'&&<div className="page-stack"><section className="page-title-row"><div><span className="eyebrow"><span className="eyebrow-dot"/> EVIDENCE REGISTER / 02</span><h1>Findings with context.</h1><p className="subtitle">Every signal is tied to a rule, location, confidence, and suggested remediation.</p></div>{analysis&&<DownloadActionButton onDownload={downloadReport} disabled={job?.status!=='completed'} label="Download report"/>}</section>{analysis&&job?<FindingsTable analysis={analysis} onUpdate={updateFinding}/>:<div className="panel"><div className="empty-panel"><span className="empty-mark">≡</span><h3>No findings to review yet</h3><p>Run an analysis to view evidence-linked security and quality signals.</p><button className="btn btn-primary" onClick={()=>setPage('New analysis')}>Start an analysis ↗</button></div></div>}</div>}
-        {page==='Architecture'&&<div className="page-stack"><section className="page-title-row"><div><span className="eyebrow"><span className="eyebrow-dot"/> REPO ATLAS / 03</span><h1>See how the pieces connect.</h1><p className="subtitle">A static view of inferred module relationships from imports and requires.</p></div><span className="panel-tag">{analysis?.architecture.nodes.length??0} NODES · {analysis?.architecture.edges.length??0} EDGES</span></section><section className="panel architecture-panel"><div className="panel-head"><div><span className="section-index">DEPENDENCY MAP</span><h2>{analysis?.project||'No project selected'}</h2></div><span className="panel-tag">STATIC INFERENCE</span></div><ArchitectureMap analysis={analysis}/><p className="panel-footnote">{analysis?.architecture.scope_note||'Dynamic loading, runtime-only relationships, and external package internals may not be represented.'}</p></section><section className="panel"><div className="panel-head"><div><span className="section-index">MODULE INVENTORY</span><h2>Largest source units</h2></div></div>{analysis?<div className="module-list">{analysis.files.slice(0,18).map(f=>{const fileFindings=analysis.findings.filter(x=>x.path===f.path);const critical=fileFindings.some(x=>x.severity==='CRITICAL'||x.severity==='HIGH');return <div className="module-row" key={f.path}><span className="module-file-icon">{f.language==='Python'?'Py':f.language==='JavaScript'?'JS':f.language==='TypeScript'?'TS':f.language.slice(0,2)}</span><span className="module-path" title={f.path}>{f.path}</span><span className={`file-signal ${critical?'file-signal-risk':fileFindings.length?'file-signal-review':'file-signal-clear'}`}>{fileFindings.length?`${fileFindings.length} signal${fileFindings.length===1?'':'s'}`:'No signal'}</span><strong>{f.loc.toLocaleString()} LOC</strong></div>})}</div>:<p className="panel-empty-copy">Run a scan to populate the module inventory.</p>}</section></div>}
+        {page==='Architecture'&&<div className="page-stack"><section className="page-title-row"><div><span className="eyebrow"><span className="eyebrow-dot"/> REPO ATLAS / 03</span><h1>See how the pieces connect.</h1><p className="subtitle">Explore the repository as a hierarchy: project root, folders, and the files inside each branch.</p></div><span className="panel-tag">{analysis?.architecture.nodes.length??0} NODES · {analysis?.architecture.edges.length??0} EDGES</span></section><section className="panel architecture-panel"><div className="panel-head"><div><span className="section-index">DEPENDENCY MAP</span><h2>{analysis?.project||'No project selected'}</h2></div><span className="panel-tag">DIRECTORY TREE</span></div><ArchitectureMap analysis={analysis}/><p className="panel-footnote">{analysis?.architecture.scope_note||'Dynamic loading, runtime-only relationships, and external package internals may not be represented.'}</p></section><section className="panel"><div className="panel-head"><div><span className="section-index">MODULE INVENTORY</span><h2>Largest source units</h2></div></div>{analysis?<div className="module-list">{analysis.files.slice(0,18).map(f=>{const fileFindings=analysis.findings.filter(x=>x.path===f.path);const critical=fileFindings.some(x=>x.severity==='CRITICAL'||x.severity==='HIGH');return <div className="module-row" key={f.path}><span className="module-file-icon">{f.language==='Python'?'Py':f.language==='JavaScript'?'JS':f.language==='TypeScript'?'TS':f.language.slice(0,2)}</span><span className="module-path" title={f.path}>{f.path}</span><span className={`file-signal ${critical?'file-signal-risk':fileFindings.length?'file-signal-review':'file-signal-clear'}`}>{fileFindings.length?`${fileFindings.length} signal${fileFindings.length===1?'':'s'}`:'No signal'}</span><strong>{f.loc.toLocaleString()} LOC</strong></div>})}</div>:<p className="panel-empty-copy">Run a scan to populate the module inventory.</p>}</section></div>}
         {page==='Ask Sentinal'&&<AskSentinalPanel job={job} provider={health?.ai_provider || 'disabled'} onNavigate={setPage}/> }
         {page==='History'&&<HistoryPage items={history} busy={busy} onRefresh={()=>void api.history().then(v=>setHistory(v.items)).catch(e=>setError(String(e)))} onOpen={openHistory}/>}
         {page==='Profile'&&<ProfilePage user={user} themePreference={themePreference} onThemeChange={setThemePreference} onSignOut={logout}/>}
