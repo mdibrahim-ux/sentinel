@@ -3622,3 +3622,285 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     right: 98px;
   }
 }
+
+
+/* --------------------------------------------------------------------------
+   Sentinal Architecture · connected project hierarchy
+   Project root → circular spiral folder nodes → pill-shaped file nodes.
+   Parent-child relationships use measured cubic curved connectors.
+   -------------------------------------------------------------------------- */
+.architecture-tree-shell {
+  overflow: hidden;
+  border: 1.5px solid #E2E3E5;
+  border-radius: 12px;
+  background: #F7F7F6;
+}
+.architecture-tree-scroll {
+  max-width: 100%;
+  overflow: auto;
+  padding: 42px 36px 54px;
+  scrollbar-width: thin;
+  scrollbar-color: #BFC2C7 transparent;
+}
+.architecture-tree-canvas {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.architecture-tree-branch {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.architecture-tree-connector-layer {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.architecture-tree-connector {
+  fill: none;
+  stroke: #A8AEB7;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.architecture-tree-node {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: #272B30;
+  font-family: "Inter", sans-serif;
+  text-align: center;
+  box-shadow: none;
+  cursor: pointer;
+  transition: border-color .18s ease, background-color .18s ease, transform .18s ease;
+}
+.architecture-root-node {
+  width: 310px;
+  min-height: 88px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 15px 24px;
+  border: 2px solid #42474F;
+  border-radius: 16px;
+  background: #FFFFFF;
+  cursor: default;
+}
+.architecture-root-kicker {
+  color: #737982;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+.architecture-root-node strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: #20242A;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -.035em;
+}
+.architecture-root-node small {
+  color: #777D85;
+  font-size: 10px;
+  font-weight: 550;
+}
+.architecture-tree-children {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 34px;
+  width: max-content;
+  margin: 0;
+  padding: 58px 0 0;
+  list-style: none;
+}
+.architecture-folder-node {
+  width: 132px;
+  height: 132px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 9px 9px;
+  border: 1.7px solid #AEB4BD;
+  border-radius: 50%;
+  background: #FFFFFF;
+}
+.architecture-folder-node:hover {
+  border-color: #727984;
+  background: #F0F1F2;
+  transform: translateY(-2px);
+}
+.architecture-folder-spiral {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #C9CDD2;
+  border-radius: 50%;
+  color: #626A75;
+  background: #F1F2F3;
+}
+.architecture-folder-spiral svg { width: 27px; height: 27px; }
+.architecture-folder-node > strong {
+  display: block;
+  max-width: 100px;
+  overflow: hidden;
+  color: #282C32;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.architecture-folder-node > small {
+  color: #7A8088;
+  font-size: 8.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.architecture-folder-chevron {
+  display: block;
+  height: 10px;
+  color: #858B93;
+  font-size: 15px;
+  line-height: 10px;
+  transition: transform .2s ease;
+}
+.architecture-folder-chevron-open { transform: rotate(180deg); }
+.architecture-folder-has-findings {
+  border-color: #C98A7C;
+  background: #FFFAF8;
+}
+.architecture-folder-has-findings .architecture-folder-spiral {
+  border-color: #E3B7AD;
+  color: #A55C4E;
+  background: #F9EDE9;
+}
+.architecture-file-node {
+  width: 224px;
+  min-height: 58px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 15px;
+  border: 1.5px solid #C8CCD1;
+  border-radius: 999px;
+  background: #FFFFFF;
+  text-align: left;
+}
+.architecture-file-node:hover {
+  border-color: #737A84;
+  background: #F0F1F2;
+  transform: translateY(-2px);
+}
+.architecture-file-selected,
+.architecture-file-selected:hover {
+  border: 2px solid #545B65;
+  background: #ECEEF0;
+}
+.architecture-file-has-findings {
+  border-color: #D18E7E;
+  background: #FFFAF8;
+}
+.architecture-file-has-findings.architecture-file-selected {
+  border-color: #A85F51;
+  background: #FBEDE8;
+}
+.architecture-file-glyph {
+  display: grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: #626A75;
+  background: #F0F1F2;
+}
+.architecture-file-has-findings .architecture-file-glyph {
+  color: #A55C4E;
+  background: #F8E8E3;
+}
+.architecture-file-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.architecture-file-copy strong {
+  display: block;
+  overflow: hidden;
+  color: #292D33;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.architecture-file-copy small {
+  overflow: hidden;
+  color: #7A8088;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.architecture-file-status {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #559B86;
+}
+.architecture-file-status-risk { background: #D67560; }
+.architecture-tree-node:focus-visible {
+  outline: 3px solid rgba(70,78,89,.28);
+  outline-offset: 4px;
+}
+.architecture-tree-shell .atlas-map-footer {
+  margin: 0;
+  padding: 14px 18px;
+  border-top: 1px solid #E1E3E6;
+  background: #FFFFFF;
+}
+.architecture-tree-shell .atlas-empty {
+  min-height: 190px;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .architecture-tree-scroll { padding: 30px 18px 38px; }
+  .architecture-root-node { width: 260px; min-height: 82px; }
+  .architecture-tree-children { gap: 22px; padding-top: 48px; }
+  .architecture-folder-node { width: 116px; height: 116px; }
+  .architecture-file-node { width: 204px; min-height: 54px; }
+  .architecture-tree-shell .atlas-map-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .architecture-tree-node, .architecture-folder-chevron { transition: none !important; }
+}
