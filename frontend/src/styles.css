@@ -3602,3 +3602,23 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (prefers-reduced-motion: reduce) {
   .project-tree-card, .project-tree-chevron { transition: none !important; }
 }
+
+
+/* Join siblings with horizontal tree rails, like a conventional org chart. */
+.project-tree-root-level::after,
+.project-tree-directory > .project-tree-level::after {
+  position: absolute;
+  top: 15px;
+  left: 107px;
+  right: 107px;
+  border-top: 1.5px solid #B7B7B7;
+  content: "";
+  pointer-events: none;
+}
+@media (max-width: 760px) {
+  .project-tree-root-level::after,
+  .project-tree-directory > .project-tree-level::after {
+    left: 98px;
+    right: 98px;
+  }
+}
