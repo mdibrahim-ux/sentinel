@@ -235,6 +235,7 @@ function ArchitectureTreeBranch({
   const expanded = hasChildren && (isRoot || expandedPaths.has(node.id) || searchActive);
   const selected = node.kind === 'file' && node.path === selectedPath;
   const file = node.file;
+  const childSignature = node.children.map(child => child.id).join('|');
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -298,7 +299,7 @@ function ArchitectureTreeBranch({
       observer?.disconnect();
       window.removeEventListener('resize', scheduleMeasure);
     };
-  }, [expanded, node.id, node.children.length]);
+  }, [expanded, node.id, childSignature]);
 
   const toggle = () => onToggle(node.id);
 
