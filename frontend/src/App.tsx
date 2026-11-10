@@ -18,16 +18,15 @@ type Props = { label: string; value: string; caption: string; icon: string; tone
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
 const NAV_ITEMS: { label: Page; icon: string; note: string }[] = [
-  { label: 'Home', icon: 'home', note: 'Workspace home' },
-  { label: 'New analysis', icon: 'scan', note: 'Analyze a repository' },
-  { label: 'Findings', icon: 'shield', note: 'Evidence and remediation' },
-  { label: 'Architecture', icon: 'network', note: 'Repository relationships' },
-  { label: 'Ask Sentinal', icon: 'sparkles', note: 'Ask about your snapshot' },
-  { label: 'History', icon: 'history', note: 'Previous snapshots' },
-  { label: 'Settings', icon: 'settings', note: 'Preferences and access' },
-  { label: 'Profile', icon: 'user-round', note: 'Developer profile' },
+  { label: 'Home', icon: 'layout-dashboard', note: 'Workspace overview' },
+  { label: 'New analysis', icon: 'scan-search', note: 'Analyze a repository' },
+  { label: 'Findings', icon: 'shield-alert', note: 'Evidence and remediation' },
+  { label: 'Architecture', icon: 'workflow', note: 'Repository relationships' },
+  { label: 'Ask Sentinal', icon: 'message-sparkles', note: 'Ask about your snapshot' },
+  { label: 'History', icon: 'clock-rotate-left', note: 'Previous snapshots' },
+  { label: 'Settings', icon: 'sliders-horizontal', note: 'Workspace preferences' },
+  { label: 'Profile', icon: 'circle-user-round', note: 'Developer profile' },
 ];
-const MOBILE_PRIMARY_NAV = new Set<Page>(['Home', 'New analysis', 'Findings', 'History']);
 type AppIconName = string;
 
 function AppIcon({ name, size = 18 }: { name: string; size?: number }) {
@@ -36,6 +35,14 @@ function AppIcon({ name, size = 18 }: { name: string; size?: number }) {
   switch (name as AppIconName) {
     case 'home': glyph = <><path d="m3.5 10.5 8.5-7 8.5 7"/><path d="M5.5 9.5v10h13v-10"/><path d="M9.5 19.5v-6h5v6"/></>; break;
     case 'scan': glyph = <><path d="M8 4H5a2 2 0 0 0-2 2v3"/><path d="M16 4h3a2 2 0 0 1 2 2v3"/><path d="M21 15v3a2 2 0 0 1-2 2h-3"/><path d="M3 15v3a2 2 0 0 0 2 2h3"/><circle cx="11" cy="11" r="4.5"/><path d="m14.5 14.5 4 4"/></>; break;
+    case 'layout-dashboard': glyph = <><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></>; break;
+    case 'scan-search': glyph = <><path d="M8 4H5a2 2 0 0 0-2 2v3M16 4h3a2 2 0 0 1 2 2v3M21 15v3a2 2 0 0 1-2 2h-3M3 15v3a2 2 0 0 0 2 2h3"/><circle cx="10.5" cy="10.5" r="3.5"/><path d="m13.2 13.2 4.3 4.3"/></>; break;
+    case 'shield-alert': glyph = <><path d="M12 3 20 6v5.2c0 4.6-3.1 7.9-8 9.8-4.9-1.9-8-5.2-8-9.8V6z"/><path d="M12 8v5M12 16.5h.01"/></>; break;
+    case 'workflow': glyph = <><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><path d="M9 6h6M6 9v6a3 3 0 0 0 3 3h6"/></>; break;
+    case 'message-sparkles': glyph = <><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 0 1 10.5 7H12"/><path d="m17 2 1.2 3.3L21.5 6.5l-3.3 1.2L17 11l-1.2-3.3-3.3-1.2 3.3-1.2z"/></>; break;
+    case 'clock-rotate-left': glyph = <><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></>; break;
+    case 'sliders-horizontal': glyph = <><path d="M4 7h8M16 7h4M4 17h4M12 17h8"/><circle cx="14" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></>; break;
+    case 'circle-user-round': glyph = <><circle cx="12" cy="12" r="9"/><circle cx="12" cy="9" r="3"/><path d="M6.5 19a6 6 0 0 1 11 0"/></>; break;
     case 'shield': glyph = <><path d="M12 3 20 6v5.2c0 4.6-3.1 7.9-8 9.8-4.9-1.9-8-5.2-8-9.8V6z"/><path d="m8.5 12 2.3 2.3 4.8-5"/></>; break;
     case 'network': glyph = <><rect x="9" y="3" width="6" height="5" rx="1.3"/><rect x="2.5" y="16" width="6" height="5" rx="1.3"/><rect x="15.5" y="16" width="6" height="5" rx="1.3"/><path d="M12 8v4M5.5 16v-4h13v4"/></>; break;
     case 'sparkles': glyph = <><path d="m12 3 1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/><path d="m5 3 .6 1.8L7.5 5.5l-1.9.7L5 8l-.6-1.8-1.9-.7 1.9-.7z"/></>; break;
@@ -43,6 +50,7 @@ function AppIcon({ name, size = 18 }: { name: string; size?: number }) {
     case 'settings': glyph = <><circle cx="12" cy="12" r="3.1"/><path d="m19.4 15 .1.1 1.1 1.1-1.8 3.1-1.6-.5a7.9 7.9 0 0 1-1.9 1.1l-.3 1.7h-3.6l-.3-1.7a7.9 7.9 0 0 1-1.9-1.1l-1.6.5-1.8-3.1L7 15a7.7 7.7 0 0 1 0-2l-1.1-1.2 1.8-3.1 1.6.5a7.9 7.9 0 0 1 1.9-1.1l.3-1.7h3.6l.3 1.7a7.9 7.9 0 0 1 1.9 1.1l1.6-.5 1.8 3.1-1.1 1.2a7.7 7.7 0 0 1-.1 2Z" transform="translate(-1.4 -1.4) scale(.98)"/></>; break;
     case 'sun': glyph = <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6m11 11 1.6 1.6M2 12h2.2m15.6 0H22M4.9 19.1l1.6-1.6m11-11 1.6-1.6"/></>; break;
     case 'moon': glyph = <path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.6 8.6 0 1 0 20.5 14Z"/>; break;
+    case 'file-down': glyph = <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 12v6m-3-3 3 3 3-3"/></>; break;
     case 'download': glyph = <><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19v2h16v-2"/></>; break;
     case 'play': glyph = <path d="m8 5 11 7-11 7z"/>; break;
     case 'more-horizontal': glyph = <><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></>; break;
@@ -383,43 +391,33 @@ function ReportPreview({ analysis, job, onDownload, onNavigate }: { analysis: An
 }
 
 function FloatingDock({ page, onNavigate, canDownload, onDownload }: { page: Page; onNavigate: (page: Page) => void; canDownload: boolean; onDownload: () => Promise<boolean> }) {
-  const [expanded, setExpanded] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreButtonRef = useRef<HTMLButtonElement | null>(null);
-  const mobileMoreItems = NAV_ITEMS.filter(item => !MOBILE_PRIMARY_NAV.has(item.label));
-  const isSecondaryPage = mobileMoreItems.some(item => item.label === page);
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setMoreOpen(false);
-        moreButtonRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [moreOpen]);
-  const navigate = (destination: Page) => {
-    onNavigate(destination);
-    setMoreOpen(false);
-    setExpanded(false);
-  };
-  return <nav className={`floating-dock ${expanded ? 'floating-dock-expanded' : ''}`} aria-label="Primary navigation" onMouseEnter={() => { if (window.matchMedia('(pointer: fine)').matches) setExpanded(true); }} onMouseLeave={() => setExpanded(false)} onFocusCapture={() => setExpanded(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setExpanded(false); setMoreOpen(false); } }}>
-    <span className="dock-logo" aria-hidden="true">S<span>.</span></span>
-    {NAV_ITEMS.map(item => <button type="button" key={item.label} className={`dock-item ${MOBILE_PRIMARY_NAV.has(item.label) ? 'dock-item-mobile-primary' : 'dock-item-mobile-secondary'} ${page === item.label ? 'dock-item-active' : ''}`} onClick={() => navigate(item.label)} aria-label={item.label} aria-current={page === item.label ? 'page' : undefined} title={item.note}><span className="dock-symbol" aria-hidden="true"><AppIcon name={item.icon} size={20}/></span><span className="dock-label">{item.label}</span></button>)}
-    <span className="dock-divider" aria-hidden="true"/>
-    <button type="button" className="dock-item dock-pdf-item" disabled={!canDownload} onClick={() => { void onDownload(); setExpanded(false); }} aria-label="Download PDF report" title={canDownload ? 'Download PDF report' : 'Complete an analysis to enable the PDF report'}><span className="dock-symbol" aria-hidden="true"><AppIcon name="download" size={20}/></span><span className="dock-label">PDF report</span></button>
-    <button ref={moreButtonRef} type="button" className={`dock-mobile-more ${moreOpen || isSecondaryPage ? 'dock-mobile-more-active' : ''}`} aria-haspopup="true" aria-expanded={moreOpen} aria-controls="dock-more-menu" aria-current={isSecondaryPage ? 'page' : undefined} aria-label={moreOpen ? 'Close more destinations' : 'More destinations'} onClick={() => setMoreOpen(open => !open)}><span className="dock-symbol" aria-hidden="true"><AppIcon name={moreOpen ? 'x' : 'more-horizontal'} size={20}/></span><span className="dock-label">More</span></button>
-    <button type="button" className="dock-toggle" onClick={() => setExpanded(v => !v)} aria-expanded={expanded} aria-label={expanded ? 'Collapse navigation dock' : 'Expand navigation dock'}><AppIcon name={expanded ? 'x' : 'chevron-down'} size={17}/></button>
-    {moreOpen && <div className="dock-more-menu" id="dock-more-menu" role="group" aria-label="More destinations">
-      {mobileMoreItems.map(item => <button type="button" key={item.label} className={`dock-more-action ${page === item.label ? 'dock-more-action-active' : ''}`} onClick={() => navigate(item.label)} aria-current={page === item.label ? 'page' : undefined}>
-        <span className="dock-more-icon"><AppIcon name={item.icon} size={18}/></span><span>{item.label}</span><small>{item.note}</small>
+  return <nav className="floating-dock" aria-label="Primary navigation">
+    <span className="dock-logo" aria-label="Sentinal">S<span>.</span></span>
+    <div className="dock-nav-items">
+      {NAV_ITEMS.map(item => <button
+        type="button"
+        key={item.label}
+        className={`dock-item ${page === item.label ? 'dock-item-active' : ''}`}
+        onClick={() => onNavigate(item.label)}
+        aria-current={page === item.label ? 'page' : undefined}
+        title={item.note}
+      >
+        <span className="dock-symbol" aria-hidden="true"><AppIcon name={item.icon} size={19}/></span>
+        <span className="dock-label">{item.label}</span>
       </button>)}
-      <span className="dock-more-divider" aria-hidden="true"/>
-      <button type="button" className="dock-more-action" disabled={!canDownload} onClick={() => { void onDownload(); setMoreOpen(false); }} aria-label="Download PDF report">
-        <span className="dock-more-icon"><AppIcon name="download" size={18}/></span><span>PDF report</span><small>{canDownload ? 'Download completed analysis' : 'Available after an analysis'}</small>
-      </button>
-    </div>}
+    </div>
+    <span className="dock-divider" aria-hidden="true"/>
+    <button
+      type="button"
+      className="dock-item dock-pdf-item"
+      disabled={!canDownload}
+      onClick={() => { void onDownload(); }}
+      aria-label="Download PDF report"
+      title={canDownload ? 'Download PDF report' : 'Complete an analysis to enable the PDF report'}
+    >
+      <span className="dock-symbol" aria-hidden="true"><AppIcon name="file-down" size={19}/></span>
+      <span className="dock-label">PDF report</span>
+    </button>
   </nav>;
 }
 
