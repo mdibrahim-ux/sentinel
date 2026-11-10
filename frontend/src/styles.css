@@ -3345,3 +3345,260 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     animation: none !important;
   }
 }
+
+
+/* --------------------------------------------------------------------------
+   Architecture · hierarchical project tree
+   Project root → folders → nested folders and files.
+   -------------------------------------------------------------------------- */
+.project-tree-shell {
+  overflow: hidden;
+  border: 1.5px solid #E3E0DA;
+  border-radius: 10px;
+  background: #FBFAF7;
+}
+.project-tree-scroll {
+  overflow: auto;
+  max-width: 100%;
+  padding: 34px 28px 42px;
+  scrollbar-width: thin;
+}
+.project-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  padding-bottom: 14px;
+}
+.project-tree-root-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: max-content;
+  max-width: 340px;
+  min-width: 250px;
+  padding: 17px 24px 16px;
+  border: 2px solid #242424;
+  border-radius: 6px;
+  color: #181818;
+  background: #FFFFFF;
+  text-align: center;
+}
+.project-tree-root-card::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 1.5px;
+  height: 31px;
+  background: #A9A9A9;
+  content: "";
+}
+.project-tree-root-kicker {
+  color: #737373;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+.project-tree-root-card strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+.project-tree-root-card small {
+  color: #77736B;
+  font-size: 11px;
+}
+.project-tree-level {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  padding: 31px 0 0;
+  list-style: none;
+}
+.project-tree-root-level::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 16px;
+  border-left: 1.5px solid #A9A9A9;
+  content: "";
+}
+.project-tree-item {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  min-width: 214px;
+  padding: 0 12px;
+  list-style: none;
+}
+.project-tree-root-level > .project-tree-item::before {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  height: 16px;
+  border-left: 1.5px solid #A9A9A9;
+  content: "";
+}
+.project-tree-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 214px;
+  min-height: 62px;
+  padding: 10px 12px;
+  border: 1.5px solid #D5D2CB;
+  border-radius: 6px;
+  color: #242424;
+  background: #FFFFFF;
+  text-align: left;
+  box-shadow: none;
+  transition: border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+.project-tree-card:hover {
+  border-color: #7C7C7C;
+  background: #F7F7F5;
+}
+.project-tree-folder-card {
+  border-color: #9FA3A8;
+  background: #F0F1F2;
+}
+.project-tree-folder-card:hover {
+  border-color: #6D747D;
+  background: #E8EAED;
+}
+.project-tree-file-card {
+  cursor: pointer;
+}
+.project-tree-card-selected {
+  border: 2px solid #3F454D;
+  background: #F0F1F2;
+}
+.project-tree-card-risk:not(.project-tree-folder-card) {
+  border-color: #D98270;
+  background: #FFF8F5;
+}
+.project-tree-card-risk.project-tree-card-selected {
+  border-color: #B85E4C;
+  background: #FFF0EA;
+}
+.project-tree-icon {
+  display: grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 5px;
+}
+.project-tree-folder-icon {
+  color: #50565F;
+  background: #DDE0E4;
+}
+.project-tree-file-icon {
+  color: #646B74;
+  background: #ECEDEF;
+}
+.project-tree-card-risk .project-tree-file-icon {
+  color: #B85E4C;
+  background: #FBE1D9;
+}
+.project-tree-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.project-tree-copy strong {
+  overflow: hidden;
+  color: #252525;
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-tree-copy small {
+  overflow: hidden;
+  color: #77736B;
+  font-size: 9px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-tree-chevron {
+  display: grid;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  color: #62676E;
+  transition: transform .2s ease;
+}
+.project-tree-chevron-open { transform: rotate(180deg); }
+.project-tree-status {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4D9B83;
+}
+.project-tree-status-risk { background: #D97761; }
+.project-tree-directory > .project-tree-level {
+  padding-top: 29px;
+}
+.project-tree-directory > .project-tree-level::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 15px;
+  border-left: 1.5px solid #B7B7B7;
+  content: "";
+}
+.project-tree-directory > .project-tree-level > .project-tree-item::before {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  height: 14px;
+  border-left: 1.5px solid #B7B7B7;
+  content: "";
+}
+.project-tree-shell .atlas-map-footer {
+  margin: 0;
+  padding: 13px 18px;
+  border-top: 1px solid #E3E0DA;
+  background: #FFFFFF;
+}
+.project-tree-shell .atlas-map-footer > span:last-child {
+  margin-left: auto;
+}
+.project-tree-shell .atlas-empty {
+  min-height: 180px;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .project-tree-scroll { padding: 25px 18px 32px; }
+  .project-tree-root-card { min-width: 220px; padding: 14px 18px; }
+  .project-tree-item { min-width: 196px; padding-inline: 8px; }
+  .project-tree-card { width: 196px; min-height: 58px; padding: 9px 10px; }
+  .project-tree-shell .atlas-map-footer { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .project-tree-shell .atlas-map-footer > span:last-child { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-tree-card, .project-tree-chevron { transition: none !important; }
+}
