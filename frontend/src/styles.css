@@ -2974,3 +2974,192 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+
+/* --------------------------------------------------------------------------
+   SENTINAL · Fixed top navigation
+   Pill-shaped dark navigation, always-expanded labels, distinct icon colours.
+   -------------------------------------------------------------------------- */
+.floating-dock {
+  position: fixed !important;
+  z-index: 100 !important;
+  top: max(14px, env(safe-area-inset-top)) !important;
+  bottom: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 9px !important;
+  width: max-content !important;
+  max-width: calc(100vw - 28px) !important;
+  min-height: 62px !important;
+  padding: 8px 10px !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  scrollbar-width: none !important;
+  border: 2px solid #0C1725 !important;
+  border-radius: 999px !important;
+  color: #F8FAFC !important;
+  background: #17263A !important;
+  box-shadow: 5px 5px 0 #0C1725 !important;
+  white-space: nowrap !important;
+  transition: none !important;
+  animation: none !important;
+}
+.floating-dock::-webkit-scrollbar { display: none !important; }
+.dock-logo {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  height: 34px !important;
+  margin: 0 4px 0 3px !important;
+  border: 2px solid #D6F36A !important;
+  border-radius: 50% !important;
+  color: #D6F36A !important;
+  font: 800 17px/1 "Space Grotesk", sans-serif !important;
+}
+.dock-logo span { color: #FF9D5C !important; }
+.dock-nav-items {
+  display: flex !important;
+  align-items: center !important;
+  flex: 0 0 auto !important;
+  gap: 5px !important;
+  min-width: max-content !important;
+}
+.dock-item, .dock-logo, .dock-toggle {
+  min-height: 42px !important;
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
+}
+.dock-item, .dock-pdf-item {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  gap: 8px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 13px !important;
+  overflow: visible !important;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+  color: #E8EEF6 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+.dock-label, .floating-dock-expanded .dock-label {
+  display: inline-block !important;
+  max-width: none !important;
+  width: auto !important;
+  overflow: visible !important;
+  opacity: 1 !important;
+  color: inherit !important;
+  font-family: "Inter", sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 750 !important;
+  line-height: 1 !important;
+  letter-spacing: -.01em !important;
+  white-space: nowrap !important;
+  transition: none !important;
+}
+.dock-symbol {
+  display: inline-grid !important;
+  place-items: center !important;
+  flex: 0 0 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  color: #75D8C3 !important;
+  background: transparent !important;
+  transform: none !important;
+  transition: none !important;
+}
+.dock-symbol svg { width: 19px !important; height: 19px !important; stroke-width: 2.8 !important; }
+.dock-nav-items .dock-item:nth-child(1) .dock-symbol { color: #69DCC8 !important; }
+.dock-nav-items .dock-item:nth-child(2) .dock-symbol { color: #FFB454 !important; }
+.dock-nav-items .dock-item:nth-child(3) .dock-symbol { color: #FF7885 !important; }
+.dock-nav-items .dock-item:nth-child(4) .dock-symbol { color: #B8A3FF !important; }
+.dock-nav-items .dock-item:nth-child(5) .dock-symbol { color: #68BDF5 !important; }
+.dock-nav-items .dock-item:nth-child(6) .dock-symbol { color: #B7E36B !important; }
+.dock-nav-items .dock-item:nth-child(7) .dock-symbol { color: #F4CB62 !important; }
+.dock-nav-items .dock-item:nth-child(8) .dock-symbol { color: #F5A2C1 !important; }
+.dock-item:hover:not(:disabled) {
+  color: #FFFFFF !important;
+  background: #2A3D55 !important;
+  border-color: rgba(255,255,255,.12) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.dock-item:hover:not(:disabled) .dock-symbol { transform: none !important; }
+.dock-item-active, .dock-item-active:hover:not(:disabled) {
+  color: #17263A !important;
+  background: #D6F36A !important;
+  border-color: #D6F36A !important;
+  box-shadow: none !important;
+}
+.dock-item-active .dock-symbol,
+.dock-item-active:hover:not(:disabled) .dock-symbol { color: #17263A !important; }
+.dock-item-active .dock-label { color: #17263A !important; }
+.dock-item:disabled { opacity: .42 !important; cursor: not-allowed !important; }
+.dock-divider {
+  display: block !important;
+  flex: 0 0 1px !important;
+  width: 1px !important;
+  height: 27px !important;
+  margin: 0 2px !important;
+  background: rgba(225,235,247,.25) !important;
+}
+.dock-pdf-item .dock-symbol { color: #8FC7FF !important; }
+.dock-pdf-item.dock-item-active .dock-symbol { color: #17263A !important; }
+.dock-toggle, .dock-mobile-more, .dock-more-menu { display: none !important; }
+.dock-item:focus-visible, .dock-logo:focus-visible {
+  outline: 3px solid #D6F36A !important;
+  outline-offset: 3px !important;
+}
+.content-area { padding-top: 126px !important; }
+@media (max-width: 760px) {
+  .floating-dock {
+    top: max(10px, env(safe-area-inset-top)) !important;
+    bottom: auto !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    min-height: 58px !important;
+    gap: 5px !important;
+    padding: 7px 8px !important;
+  }
+  .dock-logo { flex-basis: 30px !important; width: 30px !important; height: 30px !important; margin-inline: 1px 3px !important; }
+  .dock-nav-items { gap: 2px !important; }
+  .dock-item, .dock-pdf-item {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 39px !important;
+    height: 39px !important;
+    gap: 6px !important;
+    padding: 0 10px !important;
+    border-radius: 999px !important;
+  }
+  .dock-symbol { flex-basis: 20px !important; width: 20px !important; height: 20px !important; }
+  .dock-symbol svg { width: 17px !important; height: 17px !important; }
+  .dock-label, .floating-dock-expanded .dock-label {
+    display: inline-block !important;
+    max-width: none !important;
+    width: auto !important;
+    opacity: 1 !important;
+    font-size: 10px !important;
+    white-space: nowrap !important;
+  }
+  .dock-divider { height: 23px !important; }
+  .content-area { padding-top: 112px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .floating-dock, .floating-dock *, .dock-item, .dock-symbol { transition: none !important; animation: none !important; }
+}
