@@ -11,7 +11,7 @@ Default local base URL: `http://localhost:8000`. JSON API routes are under `/api
 | POST | `/api/analysis/demo` | starts the included deterministic demo fixture |
 | GET | `/api/analysis/{job_id}` | job status/progress; full normalized analysis when available |
 | GET | `/api/analysis/{job_id}/report.pdf` | Four-page PDF download; AWS mode redirects to a short-lived presigned S3 object URL |
-| POST | `/api/analysis/{job_id}/ask` | Local Ollama Q&A: JSON `question`, optional `selected_path`, and up to 8 prior `history` turns. Requires a completed local analysis and `AI_PROVIDER=ollama`; unavailable in AWS runtime. |
+| POST | `/api/analysis/{job_id}/ask` | AI Q&A: JSON `question`, optional `selected_path`, and up to 8 prior `history` turns. Requires a completed local analysis and either `AI_PROVIDER=ollama` or `AI_PROVIDER=openrouter` (with `OPENROUTER_API_KEY`); unavailable in AWS runtime. |
 | PATCH | `/api/analysis/{job_id}/findings/{finding_id}` | JSON `status` (`open`, `investigate`, `accepted`, `fixed`, `ignored`) and optional `note` |
 
 ## Job states
@@ -37,9 +37,9 @@ Default local base URL: `http://localhost:8000`. JSON API routes are under `/api
 See FastAPI `/docs` locally for the OpenAPI schema and concrete request models.
 
 
-## Ask Sentinal (local Ollama)
+## Ask Sentinal (local Ollama or OpenRouter cloud)
 
-`POST /api/analysis/{job_id}/ask` requires a completed local analysis and `AI_PROVIDER=ollama`. Example request:
+`POST /api/analysis/{job_id}/ask` requires a completed local analysis and either `AI_PROVIDER=ollama` or `AI_PROVIDER=openrouter` with `OPENROUTER_API_KEY`. OpenRouter sends the bounded analysis context to its cloud service; review its model/provider data policies before use. Example request:
 
 ```json
 {
@@ -51,4 +51,4 @@ See FastAPI `/docs` locally for the OpenAPI schema and concrete request models.
 }
 ```
 
-`selected_path` and `history` are optional. The endpoint returns `{ "answer": "...", "provider": "ollama", "model": "..." }`. Questions and prior turn content are bounded by the request schema. The route does not run in the AWS runtime because AWS cannot reach your local Ollama service. An unavailable provider responds with `503`, an Ollama timeout with `504`, and other upstream failures with `502`.
+`selected_path` and `history` are optional. The endpoint returns `{ "answer": "...", "provider": "ollama" | "openrouter", "model": "..." }`. Questions and prior turn content are bounded by the request schema. The route is currently disabled in the AWS runtime. An unavailable provider responds with `503`, an Ollama timeout with `504`, and other upstream failures with `502`.
