@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from './api';
 import { cloudAuthEnabled, confirmSignUp, confirmPasswordReset, requestPasswordReset, restoreSession, sessionToken, SessionUser, signIn, signOut, signUp } from './auth';
@@ -391,12 +391,29 @@ function ReportPreview({ analysis, job, onDownload, onNavigate }: { analysis: An
 }
 
 function FloatingDock({ page, onNavigate, canDownload, onDownload }: { page: Page; onNavigate: (page: Page) => void; canDownload: boolean; onDownload: () => Promise<boolean> }) {
+  const navItemsRef = useRef<HTMLDivElement | null>(null);
+  const activeItemRef = useRef<HTMLButtonElement | null>(null);
+  const [activePill, setActivePill] = useState({ left: 0, width: 0 });
+
+  useLayoutEffect(() => {
+    const updateActivePill = () => {
+      const nav = navItemsRef.current;
+      const active = activeItemRef.current;
+      if (!nav || !active) return;
+      setActivePill({ left: active.offsetLeft, width: active.offsetWidth });
+    };
+    updateActivePill();
+    window.addEventListener('resize', updateActivePill);
+    return () => window.removeEventListener('resize', updateActivePill);
+  }, [page]);
+
   return <nav className="floating-dock" aria-label="Primary navigation">
-    <span className="dock-logo" aria-label="Sentinal">S<span>.</span></span>
-    <div className="dock-nav-items">
+    <div className="dock-nav-items" ref={navItemsRef}>
+      <span className="dock-active-indicator" aria-hidden="true" style={{ left: activePill.left, width: activePill.width }}/>
       {NAV_ITEMS.map(item => <button
         type="button"
         key={item.label}
+        ref={page === item.label ? activeItemRef : undefined}
         className={`dock-item ${page === item.label ? 'dock-item-active' : ''}`}
         onClick={() => onNavigate(item.label)}
         aria-current={page === item.label ? 'page' : undefined}
