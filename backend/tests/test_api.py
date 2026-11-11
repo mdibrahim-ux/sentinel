@@ -154,3 +154,33 @@ def test_ask_sentinal_accepts_openrouter_provider(monkeypatch):
     assert response.status_code == 200
     assert response.json()["provider"] == "openrouter"
     assert response.json()["model"] == "test/free-model"
+
+
+def test_ask_sentinal_logs_safe_traceback_for_unexpected_value_error(monkeypatch, caplog):
+    import logging
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "AI_PROVIDER", "openrouter")
+    monkeypatch.setattr(main_module, "OPENROUTER_API_KEY", "test-only-key")
+
+    def fail_with_value_error(analysis, question, selected_path=None, history=None):
+        raise ValueError("sensitive request detail must not be logged")
+
+    monkeypatch.setattr(main_module, "answer_question", fail_with_value_error)
+    submitted = client.post("/api/analysis/demo")
+    assert submitted.status_code == 200
+    job_id = submitted.json()["id"]
+
+    with caplog.at_level(logging.ERROR, logger="uvicorn.error"):
+        response = client.post(
+            f"/api/analysis/{job_id}/ask",
+            json={"question": "What should I fix first?"},
+        )
+
+    assert response.status_code == 502
+    assert "ValueError" in response.json()["detail"]
+    assert "reference" in response.json()["detail"]
+    assert "Ask Sentinal internal failure" in caplog.text
+    assert "ValueError" in caplog.text
+    assert "sensitive request detail must not be logged" not in caplog.text
+
