@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import traceback
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -255,7 +257,18 @@ def ask_sentinal(job_id: str, payload: AskSentinalRequest, request: Request) -> 
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Ask Sentinal failed safely ({type(exc).__name__}). Check the backend terminal; source content is not logged.") from exc
+        # Log only the application traceback and exception class. Do not log request bodies,
+        # repository paths, prompts, model responses, or credentials.
+        request_id = uuid.uuid4().hex[:10]
+        frames = "".join(traceback.format_tb(exc.__traceback__))
+        logging.getLogger("uvicorn.error").error(
+            "Ask Sentinal internal failure: request_id=%s exception_type=%s\n%s",
+            request_id, type(exc).__name__, frames,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"Ask Sentinal failed safely ({type(exc).__name__}; reference {request_id}). Check the backend terminal; source content is not logged.",
+        ) from exc
 
 
 @app.patch("/api/analysis/{job_id}/findings/{finding_id}")
