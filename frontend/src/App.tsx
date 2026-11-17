@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from './api';
-import { cloudAuthEnabled, confirmSignUp, confirmPasswordReset, requestPasswordReset, restoreSession, sessionToken, SessionUser, signIn, signOut, signUp } from './auth';
+import { cloudAuthEnabled, confirmSignUp, confirmPasswordReset, requestPasswordReset, restoreSession, sessionToken, SessionUser, signIn, signUp } from './auth';
 import type { Analysis, AnalysisJob, Finding, Severity } from './types';
 
 type Page = 'Home' | 'New analysis' | 'Findings' | 'Architecture' | 'Ask Sentinal' | 'History' | 'Settings' | 'Profile';
@@ -124,7 +124,7 @@ function CubeIllustration() {
   </svg>;
 }
 
-function LoginScreen({ onLogin, themePreference, onThemeChange }: { onLogin: (user: SessionUser) => void; themePreference: ThemePreference; onThemeChange: (value: ThemePreference) => void }) {
+function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void }) {
   const [mode, setMode] = useState<'signin' | 'signup' | 'confirm' | 'reset' | 'reset-confirm'>('signin');
   const [email, setEmail] = useState(() => localStorage.getItem('sentinal-remembered-email') || ''); const [password, setPassword] = useState(''); const [code, setCode] = useState(''); const [rememberEmail, setRememberEmail] = useState(() => localStorage.getItem('sentinal-remember-email-enabled') === '1');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
@@ -935,7 +935,7 @@ function AskSentinalPanel({ job, provider, onNavigate }: { job: AnalysisJob | nu
   </div>;
 }
 
-function ProfilePage({ user, themePreference, onThemeChange, onSignOut }: { user: SessionUser; themePreference: ThemePreference; onThemeChange: (value: ThemePreference) => void; onSignOut: () => void }) {
+function ProfilePage({ user, onSignOut }: { user: SessionUser; onSignOut: () => void }) {
   const [profile, setProfile] = useState<ProfileData>(() => emptyProfile(user.username));
   const [baseline, setBaseline] = useState<ProfileData>(() => emptyProfile(user.username));
   const [editing, setEditing] = useState(true);
@@ -1029,7 +1029,7 @@ function App() {
   const logout=()=>{setPage('Home');};
   const openHistory=async(id:string)=>{try{const record=await api.getAnalysis(id);setJob(record);setPage('Home');}catch(e){setError(e instanceof Error?e.message:'Could not open analysis.');}};
   if (authChecking) return <div className="auth-loading-shell"><Brand/><span className="auth-loading-indicator"><i/>Checking your secure session…</span></div>;
-  if(!user)return <LoginScreen onLogin={login} themePreference={themePreference} onThemeChange={setThemePreference}/>;
+  if(!user)return <LoginScreen onLogin={login}/>;
   const analysis=job?.analysis||null;
   return <div className="app-shell">
     <main className="main-area">
@@ -1040,7 +1040,7 @@ function App() {
         {page==='Architecture'&&<div className="page-stack"><section className="page-title-row"><div><span className="eyebrow"><span className="eyebrow-dot"/> REPO ATLAS / 03</span><h1>Explore your project structure.</h1><p className="subtitle">A connected view of the project root, nested folders, and individual files.</p></div><span className="panel-tag">{analysis?.files.length ?? 0} FILES · {analysis?.findings.length ?? 0} FINDINGS</span></section><section className="panel architecture-panel"><div className="panel-head"><div><span className="section-index">PROJECT TREE</span><h2>{analysis?.project||'No project selected'}</h2></div><span className="panel-tag">DIRECTORY TREE</span></div><ArchitectureMap analysis={analysis}/><p className="panel-footnote">{analysis?.architecture.scope_note||'Dynamic loading, runtime-only relationships, and external package internals may not be represented.'}</p></section><section className="panel"><div className="panel-head"><div><span className="section-index">MODULE INVENTORY</span><h2>Largest source units</h2></div></div>{analysis?<div className="module-list">{analysis.files.slice(0,18).map(f=>{const fileFindings=analysis.findings.filter(x=>x.path===f.path);const critical=fileFindings.some(x=>x.severity==='CRITICAL'||x.severity==='HIGH');return <div className="module-row" key={f.path}><span className="module-file-icon">{f.language==='Python'?'Py':f.language==='JavaScript'?'JS':f.language==='TypeScript'?'TS':f.language.slice(0,2)}</span><span className="module-path" title={f.path}>{f.path}</span><span className={`file-signal ${critical?'file-signal-risk':fileFindings.length?'file-signal-review':'file-signal-clear'}`}>{fileFindings.length?`${fileFindings.length} signal${fileFindings.length===1?'':'s'}`:'No signal'}</span><strong>{f.loc.toLocaleString()} LOC</strong></div>})}</div>:<p className="panel-empty-copy">Run a scan to populate the module inventory.</p>}</section></div>}
         {page==='Ask Sentinal'&&<AskSentinalPanel job={job} provider={health?.ai_provider || 'disabled'} onNavigate={setPage}/> }
         {page==='History'&&<HistoryPage items={history} busy={busy} onRefresh={()=>void api.history().then(v=>setHistory(v.items)).catch(e=>setError(String(e)))} onOpen={openHistory}/>}
-        {page==='Profile'&&<ProfilePage user={user} themePreference={themePreference} onThemeChange={setThemePreference} onSignOut={logout}/>}
+        {page==='Profile'&&<ProfilePage user={user} onSignOut={logout}/>}
         {page==='Settings'&&<div className="page-stack"><section className="page-title-row"><div><span className="eyebrow"><span className="eyebrow-dot"/> PREFERENCES / 05</span><h1>Keep the boundaries clear.</h1><p className="subtitle">Control analysis behavior, AI options, and how to run this workspace.</p></div></section><section className="panel appearance-panel"><div className="appearance-copy"><span className="settings-icon"><AppIcon name="palette" size={20}/></span><div><span className="section-index">VISUAL STYLE</span><h2>Appearance</h2><p>Sentinal uses a clear, consistent light interface.</p></div></div><ThemePreferenceControl/></section><section className="settings-grid"><article className="panel settings-card"><span className="settings-icon">⌘</span><span className="section-index">RUNTIME</span><h2>Execution environment</h2><p>Sentinal reads supported files and runs deterministic parsers. Submitted code is never executed as part of a normal scan.</p><div className="settings-detail"><span>Mode</span><strong>{health?.execution_mode||'checking…'}</strong></div><div className="settings-detail"><span>API</span><strong>{'http://localhost:8000'}</strong></div></article><article className="panel settings-card"><span className="settings-icon settings-icon-orange">✳</span><span className="section-index">AI EXPLANATION</span><h2>Optional narrative layer</h2><p>AI explanation is constrained to redacted structured findings. Counts, locations, and chart values stay grounded in deterministic analysis.</p><div className="settings-detail"><span>Configured provider</span><strong>{health?.ai_provider||'disabled'}</strong></div><div className="settings-inline-note">Bedrock or OpenAI inference may incur usage charges. Review privacy and cost before enabling.</div></article><article className="panel settings-card"><span className="settings-icon">▤</span><span className="section-index">REPORTS</span><h2>Export and evidence</h2><p>Completed scans export a four-page report with severity charts, prioritized remediation, and coverage notes. It distinguishes observed evidence from inferred guidance.</p><div className="settings-detail"><span>Last report</span><strong>{job?.status==='completed'?'Ready to download':'Not generated yet'}</strong></div><DownloadActionButton onDownload={downloadReport} disabled={job?.status!=='completed'} label="Download latest report"/></article><article className="panel settings-card"><span className="settings-icon settings-icon-orange">◇</span><span className="section-index">DATA & PRIVACY</span><h2>Know what is retained</h2><p>Local mode persists analysis metadata and results in SQLite. Uploaded archive copies are filtered and deleted after processing. AWS retention depends on your deployed bucket lifecycle settings.</p><div className="settings-detail"><span>Local storage</span><strong>backend/data/</strong></div><div className="settings-inline-note">Never upload production secrets. Credential-like evidence is redacted, but the scanner cannot guarantee that all sensitive data is recognized.</div></article></section></div>}
       </div>
     </main>
