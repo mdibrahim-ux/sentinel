@@ -5,7 +5,6 @@ import { cloudAuthEnabled, confirmSignUp, confirmPasswordReset, requestPasswordR
 import type { Analysis, AnalysisJob, Finding, Severity } from './types';
 
 type Page = 'Home' | 'New analysis' | 'Findings' | 'Architecture' | 'Ask Sentinal' | 'History' | 'Settings' | 'Profile';
-type ThemePreference = 'light';
 type ProfileData = { full_name: string; username: string; headline: string; bio: string; location: string; website: string; email: string; email_public: boolean; github_username: string; github_url: string; preferred_languages: string[]; technical_skills: string[]; interests: string[]; role: string; avatar_data_url: string; default_dashboard: string; notifications_enabled: boolean; privacy_profile_public: boolean; created_at: string; updated_at: string };
 type GitHubOverview = { login: string; name: string | null; avatar_url: string; html_url: string; public_repos: number; followers: number; following: number; bio: string | null; repositories: { name: string; html_url: string; description: string | null; language: string | null; stargazers_count: number; updated_at: string }[] };
 const emptyProfile = (username = ''): ProfileData => ({ full_name: '', username: username.includes('@') ? username.split('@')[0] : username, headline: '', bio: '', location: '', website: '', email: username.includes('@') ? username : '', email_public: false, github_username: '', github_url: '', preferred_languages: [], technical_skills: [], interests: [], role: '', avatar_data_url: '', default_dashboard: 'Home', notifications_enabled: true, privacy_profile_public: false, created_at: '', updated_at: '' });
@@ -975,8 +974,6 @@ function App() {
   const [user,setUser]=useState<SessionUser|null>(()=>({username:'Public workspace',localMode:true}));
   const [authChecking, setAuthChecking] = useState(cloudAuthEnabled);
   const [page,setPage]=useState<Page>('Home'); const [job,setJob]=useState<AnalysisJob|null>(null); const [busy,setBusy]=useState(false); const [error,setError]=useState(''); const [health,setHealth]=useState<{execution_mode:string;ai_provider:string}|null>(null); const [history,setHistory]=useState<Record<string,unknown>[]>([]);
-  const [themePreference] = useState<ThemePreference>('light');
-  const setThemePreference = (_value: ThemePreference) => undefined;
   useEffect(() => { document.documentElement.dataset.theme = 'light'; document.documentElement.dataset.themePreference = 'light'; document.documentElement.style.colorScheme = 'light'; document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#F8F6F0'); localStorage.setItem('sentinal-theme', 'light'); }, []);
   useEffect(() => {
     if (!cloudAuthEnabled) { setAuthChecking(false); return; }
